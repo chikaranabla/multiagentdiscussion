@@ -30,10 +30,17 @@ type AIAgent = {
   likes: number
 }
 
+// 型定義を追加
+type DifyResponse = {
+    answer: string;
+    conversation_id: string;
+    message_id: string;
+}
+
 const initialAIAgents: AIAgent[] = [
-  { id: 1, name: "自然言語処理専門家", expertise: "自然言語処理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 87 },
-  { id: 2, name: "データサイエンティスト", expertise: "データサイエンス", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 65 },
-  { id: 3, name: "プロジェクトマネージャー", expertise: "プロジェクト管理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 92 },
+  { id: 1, name: "自然言語処理専門家A", expertise: "自然言語処理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 87 },
+  { id: 2, name: "データサイエンティストB", expertise: "データサイエンス", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 65 },
+  { id: 3, name: "プロジェクトマネージャーC", expertise: "プロジェクト管理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 92 },
 ]
 
 export function EnhancedMultiAgentDiscussionInterfaceComponent() {
@@ -57,36 +64,51 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
   const handleSendMessage = async () => {
     if (inputMessage.trim() !== "") {
-      const newMessage: Message = {
-        id: messages.length + 1,
-        sender: "ユーザー",
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-      setMessages([...messages, newMessage])
-      setInputMessage("")
-      setIsLoading(true)
+        try {
+            const newMessage: Message = {
+                id: messages.length + 1,
+                sender: "ユーザー",
+                content: inputMessage,
+                timestamp: new Date(),
+            }
+            setMessages([...messages, newMessage])
+            setInputMessage("")
+            setIsLoading(true)
 
-      // Simulate API call to get AI responses
-      await new Promise(resolve => setTimeout(resolve, 1000))
+            // Dify APIを呼び出し
+            const conversationId = ""; // 必要に応じて会話IDを設定
+            const userId = "user-" + Date.now(); // ユニークなユーザーIDを生成
+            const aiResponse = await fetchChatbotResponse(inputMessage, conversationId, userId);
 
-      const activeAgents = aiAgents.filter(agent => agent.isActive)
-      const aiResponses = activeAgents.map(agent => ({
-        id: messages.length + 2 + activeAgents.indexOf(agent),
-        sender: agent.name,
-        content: `${agent.name}からの回答: "${inputMessage}"`,
-        timestamp: new Date(),
-      }))
+            if (aiResponse) {
+                const aiMessage: Message = {
+                    id: messages.length + 2,
+                    sender: "自然言語処理専門家A",
+                    content: aiResponse,
+                    timestamp: new Date(),
+                };
 
-      setMessages(prevMessages => [...prevMessages, ...aiResponses])
-      setIsLoading(false)
+                setMessages(prevMessages => [...prevMessages, aiMessage]);
 
-      if (isSpeechEnabled) {
-        aiResponses.forEach(response => {
-          const utterance = new SpeechSynthesisUtterance(response.content)
-          speechSynthesis.speak(utterance)
-        })
-      }
+                if (isSpeechEnabled) {
+                    const utterance = new SpeechSynthesisUtterance(aiResponse);
+                    utterance.lang = 'ja-JP'; // 日本語に設定
+                    speechSynthesis.speak(utterance);
+                }
+            }
+        } catch (error) {
+            console.error("メッセージ送信中にエラーが発生しました:", error);
+            // エラーメッセージを表示
+            const errorMessage: Message = {
+                id: messages.length + 2,
+                sender: "システム",
+                content: "申し訳ありません。エラーが発生しました。もう一度お試しください。",
+                timestamp: new Date(),
+            };
+            setMessages(prevMessages => [...prevMessages, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
     }
   }
 
@@ -123,6 +145,40 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
   const resetConversation = () => {
     setMessages([])
+  }
+
+  async function fetchChatbotResponse(
+    query: string, 
+    conversationId: string, 
+    userId: string
+  ): Promise<string> {
+    try {
+        const response = await fetch('https://api.dify.ai/v1/chat-messages', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer app-lxKRD1QhC783612Fr65VWtYs',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                inputs: {},
+                query: query,
+                response_mode: 'blocking', // streamingではなくblockingモードに変更
+                conversation_id: conversationId,
+                user: userId,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error: ${response.statusText}`);
+        }
+
+        const data: DifyResponse = await response.json();
+        console.log('Dify API Response:', data); // デバッグ用
+        return data.answer;
+    } catch (error) {
+        console.error("API呼び出しに失敗しました:", error);
+        return "申し訳ありません。エラーが発生しました。もう一度お試しください。";
+    }
   }
 
   return (
@@ -197,7 +253,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -50 }}
                   transition={{ duration: 0.3 }}
-                  className={`mb-4 ${message.sender === "ユーザー" ? "text-right" : "text-left"}`}
+                  className={`mb-4 ${message.sender === "ユザー" ? "text-right" : "text-left"}`}
                 >
                   <div className={`inline-block p-3 rounded-lg ${message.sender === "ユーザー" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
                     <p className="font-bold">{message.sender}</p>
@@ -275,7 +331,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
         <PopoverContent className="w-80">
           <div className="grid gap-4">
             <div className="space-y-2">
-              <h4 className="font-medium leading-none">クイック設定</h4>
+              <h4 className="font-medium leading-none">クイック設</h4>
               <p className="text-sm text-muted-foreground">
                 エージェントの追加/削除やその他の設定を行います。
               </p>
