@@ -11,8 +11,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { AnimatePresence, motion } from "framer-motion"
+import { motion, AnimatePresence } from 'framer-motion'
 import { Sun, Moon, Send, Loader2, Save, Download, RotateCcw, Settings, Plus, Minus, Volume2, Heart } from "lucide-react"
+import { v4 as uuidv4 } from 'uuid';  // ファイルの先頭に追加
 
 type Message = {
   id: number
@@ -30,7 +31,7 @@ type AIAgent = {
   likes: number
 }
 
-// 型定義を追加
+// 型定義追加
 type DifyResponse = {
     answer: string;
     conversation_id: string;
@@ -44,24 +45,30 @@ interface AgentConfig {
   apiKey: string;      // dify APIキーを追加
 }
 
+// エラー型の定義を追加
+interface APIError extends Error {
+  message: string;
+}
+
+// agents の定義を修正
 const agents: AgentConfig[] = [
   {
-    name: "Expert A",
+    name: "自然言語処理専門家A",
     role: "Financial Analyst",
-    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_A,
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A
+    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A || ''
   },
   {
-    name: "Expert B",
+    name: "データサイエンティストB",
     role: "Risk Manager",
-    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_B,
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B
+    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B || ''
   },
   {
-    name: "Expert C",
+    name: "プロジェクトマネージャーC",
     role: "Investment Strategist",
-    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_C,
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_C
+    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_C || ''
   }
 ];
 
@@ -71,34 +78,69 @@ const initialAIAgents: AIAgent[] = [
   { id: 3, name: "プロジェクトマネージャーC", expertise: "プロジェクト管理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 92 },
 ]
 
-// sendMessageToAgent関数を追加
+// sendMessageToAgent関数を修正
 const sendMessageToAgent = async (message: string, agent: AgentConfig): Promise<string> => {
+  console.log('Agent Config:', agent); // デバッグ用
+
+  if (!agent.apiKey) {
+    throw new Error(`${agent.name}のAPIキーが設定されていません`);
+  }
+
   try {
-    const response = await fetch(agent.apiEndpoint!, {  // !を追加して型エラーを解消
+    const response = await fetch('/api/dify-proxy', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${agent.apiKey!}`,  // !を追加
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        inputs: {},
+        apiKey: agent.apiKey,
         query: message,
-        response_mode: 'blocking',
-        user: `user-${Date.now()}`,
+        user: "default-user",
+        response_mode: "blocking",
+        inputs: {}
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error Details:', errorData);
+      throw new Error(`APIエラー: ${response.status} - ${errorData.message || '不明なエラー'}`);
     }
 
-    const data: DifyResponse = await response.json();
-    return data.answer;
+    const data = await response.json();
+    console.log('API Response:', data); // デバッグ用
+
+    // レスポンスの処理を改善
+    if (data.answer) {
+      return data.answer;
+    } else if (data.message?.content) {
+      return data.message.content;
+    } else if (data.response) {
+      return data.response;
+    } else if (data.text) {
+      return data.text;
+    } else {
+      console.error('Unexpected API response:', data);
+      return `${agent.name}からの応答を解析できませんでした。`;
+    }
   } catch (error) {
-    console.error(`${agent.name}からの応答でエラーが発生:`, error);
-    return `${agent.name}からの応答中にエラーが発生しました。`;
+    console.error(`${agent.name}のAPI呼び出しの詳細エラー:`, error);
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      return `${agent.name}との接続に失敗しました。インターネット接続を確認してください。`;
+    }
+    const apiError = error as APIError;
+    return `${agent.name}との通信中にエラー: ${apiError.message}`;
   }
 };
+
+function connectToAgent(agentName: string) {
+    try {
+        // 接続処理のコード
+    } catch (error) {
+        console.error(`${agentName}との接に失敗しました: `, error);
+        alert(`${agentName}との接続に失敗しました。インターネット接続を確認してください。`);
+    }
+}
 
 export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -108,6 +150,8 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [agentConfigs, setAgentConfigs] = useState<AgentConfig[]>([]);
 
   useEffect(() => {
     document.body.classList.toggle('dark', isDarkMode)
@@ -119,62 +163,105 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
     }
   }, [messages])
 
-  // handleSendMessageを更新
+  // 環境変数の読み込み
+  useEffect(() => {
+    setAgentConfigs([
+      {
+        name: "自然言語処理専門家A",
+        role: "Financial Analyst",
+        apiEndpoint: "https://api.dify.ai/v1/chat-messages",
+        apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A || ''
+      },
+      {
+        name: "データサイエンティストB",
+        role: "Risk Manager",
+        apiEndpoint: "https://api.dify.ai/v1/chat-messages",
+        apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B || ''
+      },
+      {
+        name: "プロジェクトマネージャーC",
+        role: "Investment Strategist",
+        apiEndpoint: "https://api.dify.ai/v1/chat-messages",
+        apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_C || ''
+      }
+    ]);
+  }, []);
+
+  // コンポーネントの先頭で環境変数をログ出力
+  useEffect(() => {
+    console.log('環境変数の確認:');
+    console.log('API_KEY_A:', process.env.NEXT_PUBLIC_DIFY_API_KEY_A);
+    console.log('API_KEY_B:', process.env.NEXT_PUBLIC_DIFY_API_KEY_B);
+    console.log('API_KEY_C:', process.env.NEXT_PUBLIC_DIFY_API_KEY_C);
+  }, []);
+
+  // コンポーネントのuseEffect内
+  useEffect(() => {
+    console.log('API Keys:', {
+      A: process.env.NEXT_PUBLIC_DIFY_API_KEY_A,
+      B: process.env.NEXT_PUBLIC_DIFY_API_KEY_B,
+      C: process.env.NEXT_PUBLIC_DIFY_API_KEY_C
+    });
+  }, []);
+
+  // handleSendMessage関数のエラーハンドリングも修正
   const handleSendMessage = async () => {
-    if (inputMessage.trim() !== "") {
-      try {
-        const newMessage: Message = {
-          id: messages.length + 1,
-          sender: "ユーザー",
-          content: inputMessage,
-          timestamp: new Date(),
-        };
-        setMessages([...messages, newMessage]);
-        setInputMessage("");
-        setIsLoading(true);
+    if (inputMessage.trim() === "") return
 
-        // アクティブな専門家全員から回答を取得
-        const activeAgents = agents.filter((_, index) => 
-          aiAgents[index].isActive
-        );
+    try {
+      setIsLoading(true)
+      setError(null)
 
-        // 全ての専門家からの応答を並行して取得
-        const responses = await Promise.all(
-          activeAgents.map(agent => sendMessageToAgent(inputMessage, agent))
-        );
+      const newMessage: Message = {
+        id: messages.length + 1,
+        sender: "ユーザー",
+        content: inputMessage,
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, newMessage])
+      setInputMessage("")
 
-        // 各専門家の応答をメッセージとして追加
-        responses.forEach((response, index) => {
+      const activeAgents = agentConfigs.filter((_, index) => aiAgents[index].isActive)
+
+      for (const agent of activeAgents) {
+        try {
+          console.log(`${agent.name}のAPIキー:`, agent.apiKey); // デバッグ用
+          console.log(`${agent.name}に送信中...`);
+          const response = await sendMessageToAgent(inputMessage, agent);
+          console.log(`${agent.name}からの応答:`, response);
+          
           const aiMessage: Message = {
-            id: messages.length + 2 + index,
-            sender: activeAgents[index].name,
+            id: Date.now(),
+            sender: agent.name,
             content: response,
             timestamp: new Date(),
           };
-          setMessages(prevMessages => [...prevMessages, aiMessage]);
+          setMessages(prev => [...prev, aiMessage]);
 
-          // 音声読み上げが有効な場合
           if (isSpeechEnabled) {
             const utterance = new SpeechSynthesisUtterance(response);
             utterance.lang = 'ja-JP';
             speechSynthesis.speak(utterance);
           }
-        });
-
-      } catch (error) {
-        console.error("エラーが発生しました:", error);
-        const errorMessage: Message = {
-          id: messages.length + 2,
-          sender: "システム",
-          content: "申し訳ありません。エラーが発生しました。",
-          timestamp: new Date(),
-        };
-        setMessages(prevMessages => [...prevMessages, errorMessage]);
-      } finally {
-        setIsLoading(false);
+        } catch (error) {
+          const apiError = error as APIError;
+          console.error(`${agent.name}からの応答でエラー:`, apiError);
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            sender: "システム",
+            content: apiError.message || `${agent.name}からの応答中にエラーが発生しました`,
+            timestamp: new Date(),
+          }]);
+        }
       }
+    } catch (error) {
+      const apiError = error as APIError;
+      console.error("エラーが発生しました:", apiError);
+      setError(apiError.message || "メッセージの送信中にエラーが発生しました。");
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
   const toggleAgentActive = (agentId: number) => {
     setAIAgents(prevAgents =>
@@ -209,6 +296,17 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
   const resetConversation = () => {
     setMessages([])
+  }
+
+  // 音声設定の追加
+  const handleSpeech = (text: string) => {
+    if (!isSpeechEnabled) return
+    
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'ja-JP'
+    utterance.rate = 1.0
+    utterance.pitch = 1.0
+    speechSynthesis.speak(utterance)
   }
 
   return (
@@ -246,7 +344,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                     </Avatar>
                     <div>
                       <p className="font-medium">{agent.name}</p>
-                      <Badge variant="secondary" className="mt-1">{agent.expertise}</Badge>
+                      <Badge className="mt-1 bg-secondary text-white">{agent.expertise}</Badge>
                     </div>
                   </div>
                   <Switch
@@ -257,9 +355,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                 </div>
                 <div className="mt-2 flex items-center">
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-0 hover:bg-transparent"
+                    className="p-0 hover:bg-transparent ghost"
                     onClick={() => incrementLikes(agent.id)}
                   >
                     <Heart className="h-4 w-4 text-red-500 mr-1" />
@@ -325,7 +421,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                 <Button onClick={exportConversation} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">
                   <Download className="mr-2 h-4 w-4" /> 会話をエクスポート
                 </Button>
-                <Button onClick={resetConversation} variant="destructive" className="w-full">
+                <Button onClick={resetConversation} className="w-full bg-red-500 hover:bg-red-600 text-white">
                   <RotateCcw className="mr-2 h-4 w-4" /> 会話をリセット
                 </Button>
               </div>
@@ -337,7 +433,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                   <Switch />
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>自動保存</span>
+                  <span>動保存</span>
                   <Switch />
                 </div>
                 <div className="flex items-center justify-between">
@@ -368,19 +464,19 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
             </div>
             <div className="grid gap-2">
               <div className="grid grid-cols-3 items-center gap-4">
-                <Button size="sm" className="h-8 w-8 p-0 bg-green-500 hover:bg-green-600 text-white">
+                <Button className="h-8 w-8 p-0 bg-green-500 hover:bg-green-600 text-white">
                   <Plus className="h-4 w-4" />
                 </Button>
                 <span className="col-span-2">新規エージェント追加</span>
               </div>
               <div className="grid grid-cols-3 items-center gap-4">
-                <Button size="sm" className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white">
+                <Button className="h-8 w-8 p-0 bg-red-500 hover:bg-red-600 text-white">
                   <Minus className="h-4 w-4" />
                 </Button>
                 <span className="col-span-2">エージェント削除</span>
               </div>
               <div className="grid grid-cols-3 items-center gap-4">
-                <Button size="sm" className="h-8  w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white">
+                <Button className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 text-white">
                   <Volume2 className="h-4 w-4" />
                 </Button>
                 <span className="col-span-2">音声設定</span>
@@ -389,6 +485,11 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
           </div>
         </PopoverContent>
       </Popover>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <span className="block sm:inline">{error}</span>
+        </div>
+      )}
     </div>
   )
 }

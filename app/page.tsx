@@ -1,5 +1,9 @@
 import { EnhancedMultiAgentDiscussionInterfaceComponent } from "@/components/enhanced-multi-agent-discussion-interface"
 
-export default function Page() {
-  return <EnhancedMultiAgentDiscussionInterfaceComponent />
+export default function HomePage() {
+  return (
+    <div>
+      <EnhancedMultiAgentDiscussionInterfaceComponent />
+    </div>
+  )
 }
