@@ -75,7 +75,7 @@ const agents: AgentConfig[] = [
 const initialAIAgents: AIAgent[] = [
   { 
     id: 1, 
-    name: "自然言語処理専門��A", 
+    name: "自然言語処理専門A", 
     expertise: "自然言語処理", 
     avatar: "", // 空文字列に変更
     isActive: true, 
@@ -186,11 +186,14 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
       const activeAgents = agentConfigs.filter((_, index) => aiAgents[index].isActive);
 
+      // エージェントごとに順番に処理
       for (const agent of activeAgents) {
         try {
+          // 各エージェントのリクエスト前に3秒待機
+          await sleep(3000);
+          
           console.log(`${agent.name}に送信中...`);
           const response = await sendMessageToAgent(inputMessage, agent);
-          console.log(`${agent.name}からの応答:`, response);
           
           const aiMessage: Message = {
             id: Date.now(),
@@ -206,7 +209,6 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
             speechSynthesis.speak(utterance);
           }
 
-          await sleep(1000);
         } catch (error) {
           const apiError = error as APIError;
           console.error(`${agent.name}からの応答でエラー:`, apiError);
@@ -215,11 +217,12 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
             setMessages(prev => [...prev, {
               id: Date.now(),
               sender: "システム",
-              content: `${agent.name}へのリクエストが制限されました。5秒後に再試行します...`,
+              content: `${agent.name}へのリクエストが制限されました。10秒後に再試行します...`,
               timestamp: new Date(),
             }]);
             
-            await sleep(5000);
+            // レート制限時は10秒待機してから再試行
+            await sleep(10000);
             try {
               const retryResponse = await sendMessageToAgent(inputMessage, agent);
               setMessages(prev => [...prev, {
@@ -232,7 +235,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
               setMessages(prev => [...prev, {
                 id: Date.now(),
                 sender: "システム",
-                content: `${agent.name}への再試行も失敗しました。`,
+                content: `${agent.name}への再試行も失敗しました。しばらく待ってから試してください。`,
                 timestamp: new Date(),
               }]);
             }
