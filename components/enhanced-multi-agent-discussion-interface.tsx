@@ -73,74 +73,31 @@ const agents: AgentConfig[] = [
 ];
 
 const initialAIAgents: AIAgent[] = [
-  { id: 1, name: "自然言語処理専門家A", expertise: "自然言語処理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 87 },
-  { id: 2, name: "データサイエンティストB", expertise: "データサイエンス", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 65 },
-  { id: 3, name: "プロジェクトマネージャーC", expertise: "プロジェクト管理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 92 },
+  { 
+    id: 1, 
+    name: "自然言語処理専門��A", 
+    expertise: "自然言語処理", 
+    avatar: "", // 空文字列に変更
+    isActive: true, 
+    likes: 87 
+  },
+  { 
+    id: 2, 
+    name: "データサイエンティストB", 
+    expertise: "データサイエンス", 
+    avatar: "", // 空文字列に変更
+    isActive: true, 
+    likes: 65 
+  },
+  { 
+    id: 3, 
+    name: "プロジェクトマネージャーC", 
+    expertise: "プロジェクト管理", 
+    avatar: "", // 空文字列に変更
+    isActive: true, 
+    likes: 92 
+  },
 ]
-
-// sendMessageToAgent関数を修正
-const sendMessageToAgent = async (message: string, agent: AgentConfig): Promise<string> => {
-  console.log('Agent Config:', agent); // デバッグ用
-
-  if (!agent.apiKey) {
-    throw new Error(`${agent.name}のAPIキーが設定されていません`);
-  }
-
-  try {
-    const response = await fetch('/api/dify-proxy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        apiKey: agent.apiKey,
-        query: message,
-        user: "default-user",
-        response_mode: "blocking",
-        inputs: {}
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('API Error Details:', errorData);
-      throw new Error(`APIエラー: ${response.status} - ${errorData.message || '不明なエラー'}`);
-    }
-
-    const data = await response.json();
-    console.log('API Response:', data); // デバッグ用
-
-    // レスポンスの処理を改善
-    if (data.answer) {
-      return data.answer;
-    } else if (data.message?.content) {
-      return data.message.content;
-    } else if (data.response) {
-      return data.response;
-    } else if (data.text) {
-      return data.text;
-    } else {
-      console.error('Unexpected API response:', data);
-      return `${agent.name}からの応答を解析できませんでした。`;
-    }
-  } catch (error) {
-    console.error(`${agent.name}のAPI呼び出しの詳細エラー:`, error);
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      return `${agent.name}との接続に失敗しました。インターネット接続を確認してください。`;
-    }
-    const apiError = error as APIError;
-    return `${agent.name}との通信中にエラー: ${apiError.message}`;
-  }
-};
-
-function connectToAgent(agentName: string) {
-    try {
-        // 接続処理のコード
-    } catch (error) {
-        console.error(`${agentName}との接に失敗しました: `, error);
-        alert(`${agentName}との接続に失敗しました。インターネット接続を確認してください。`);
-    }
-}
 
 export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -152,6 +109,151 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [agentConfigs, setAgentConfigs] = useState<AgentConfig[]>([]);
+
+  // ユーティリティ関数
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  // sendMessageToAgent関数をここに移動
+  const sendMessageToAgent = async (message: string, agent: AgentConfig): Promise<string> => {
+    console.log('Agent Config:', agent);
+
+    if (!agent.apiKey) {
+      throw new Error(`${agent.name}のAPIキーが設定されていません`);
+    }
+
+    try {
+      const response = await fetch('/api/dify-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          apiKey: agent.apiKey,
+          query: message,
+          user: "default-user",
+          response_mode: "blocking",
+          inputs: {}
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error Details:', errorData);
+        throw new Error(`APIエラー: ${response.status} - ${errorData.message || '不明なエラー'}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response:', data);
+
+      if (data.answer) {
+        return data.answer;
+      } else if (data.message?.content) {
+        return data.message.content;
+      } else if (data.response) {
+        return data.response;
+      } else if (data.text) {
+        return data.text;
+      } else {
+        console.error('Unexpected API response:', data);
+        return `${agent.name}からの応答を解析できませんでした。`;
+      }
+    } catch (error) {
+      console.error(`${agent.name}のAPI呼び出しの詳細エラー:`, error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        return `${agent.name}との接続に失敗しました。インターネット接続を確認してください。`;
+      }
+      const apiError = error as APIError;
+      return `${agent.name}との通信中にエラー: ${apiError.message}`;
+    }
+  };
+
+  // handleSendMessage関数をここに移動
+  const handleSendMessage = async () => {
+    if (inputMessage.trim() === "") return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const newMessage: Message = {
+        id: messages.length + 1,
+        sender: "ユーザー",
+        content: inputMessage,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, newMessage]);
+      setInputMessage("");
+
+      const activeAgents = agentConfigs.filter((_, index) => aiAgents[index].isActive);
+
+      for (const agent of activeAgents) {
+        try {
+          console.log(`${agent.name}に送信中...`);
+          const response = await sendMessageToAgent(inputMessage, agent);
+          console.log(`${agent.name}からの応答:`, response);
+          
+          const aiMessage: Message = {
+            id: Date.now(),
+            sender: agent.name,
+            content: response,
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, aiMessage]);
+
+          if (isSpeechEnabled) {
+            const utterance = new SpeechSynthesisUtterance(response);
+            utterance.lang = 'ja-JP';
+            speechSynthesis.speak(utterance);
+          }
+
+          await sleep(1000);
+        } catch (error) {
+          const apiError = error as APIError;
+          console.error(`${agent.name}からの応答でエラー:`, apiError);
+          
+          if (apiError.message.includes('Rate Limit Error')) {
+            setMessages(prev => [...prev, {
+              id: Date.now(),
+              sender: "システム",
+              content: `${agent.name}へのリクエストが制限されました。5秒後に再試行します...`,
+              timestamp: new Date(),
+            }]);
+            
+            await sleep(5000);
+            try {
+              const retryResponse = await sendMessageToAgent(inputMessage, agent);
+              setMessages(prev => [...prev, {
+                id: Date.now(),
+                sender: agent.name,
+                content: retryResponse,
+                timestamp: new Date(),
+              }]);
+            } catch (retryError) {
+              setMessages(prev => [...prev, {
+                id: Date.now(),
+                sender: "システム",
+                content: `${agent.name}への再試行も失敗しました。`,
+                timestamp: new Date(),
+              }]);
+            }
+          } else {
+            setMessages(prev => [...prev, {
+              id: Date.now(),
+              sender: "システム",
+              content: apiError.message || `${agent.name}からの応答中にエラーが発生しました`,
+              timestamp: new Date(),
+            }]);
+          }
+        }
+      }
+    } catch (error) {
+      const apiError = error as APIError;
+      console.error("エラーが発生しました:", apiError);
+      setError(apiError.message || "メッセージの送信中にエラーが発生しました。");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     document.body.classList.toggle('dark', isDarkMode)
@@ -203,65 +305,6 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
       C: process.env.NEXT_PUBLIC_DIFY_API_KEY_C
     });
   }, []);
-
-  // handleSendMessage関数のエラーハンドリングも修正
-  const handleSendMessage = async () => {
-    if (inputMessage.trim() === "") return
-
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const newMessage: Message = {
-        id: messages.length + 1,
-        sender: "ユーザー",
-        content: inputMessage,
-        timestamp: new Date(),
-      }
-      setMessages(prev => [...prev, newMessage])
-      setInputMessage("")
-
-      const activeAgents = agentConfigs.filter((_, index) => aiAgents[index].isActive)
-
-      for (const agent of activeAgents) {
-        try {
-          console.log(`${agent.name}のAPIキー:`, agent.apiKey); // デバッグ用
-          console.log(`${agent.name}に送信中...`);
-          const response = await sendMessageToAgent(inputMessage, agent);
-          console.log(`${agent.name}からの応答:`, response);
-          
-          const aiMessage: Message = {
-            id: Date.now(),
-            sender: agent.name,
-            content: response,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, aiMessage]);
-
-          if (isSpeechEnabled) {
-            const utterance = new SpeechSynthesisUtterance(response);
-            utterance.lang = 'ja-JP';
-            speechSynthesis.speak(utterance);
-          }
-        } catch (error) {
-          const apiError = error as APIError;
-          console.error(`${agent.name}からの応答でエラー:`, apiError);
-          setMessages(prev => [...prev, {
-            id: Date.now(),
-            sender: "システム",
-            content: apiError.message || `${agent.name}からの応答中にエラーが発生しました`,
-            timestamp: new Date(),
-          }]);
-        }
-      }
-    } catch (error) {
-      const apiError = error as APIError;
-      console.error("エラーが発生しました:", apiError);
-      setError(apiError.message || "メッセージの送信中にエラーが発生しました。");
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const toggleAgentActive = (agentId: number) => {
     setAIAgents(prevAgents =>
@@ -459,7 +502,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
             <div className="space-y-2">
               <h4 className="font-medium leading-none">クイック設</h4>
               <p className="text-sm text-muted-foreground">
-                エージェントの追加/削除やその他の設定を行います。
+                エージェントの追加/除やその他の設定を行います。
               </p>
             </div>
             <div className="grid gap-2">
