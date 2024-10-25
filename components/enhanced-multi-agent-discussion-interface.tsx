@@ -37,11 +37,68 @@ type DifyResponse = {
     message_id: string;
 }
 
+interface AgentConfig {
+  name: string;
+  role: string;
+  apiEndpoint: string; // dify APIのエンドポイントを追加
+  apiKey: string;      // dify APIキーを追加
+}
+
+const agents: AgentConfig[] = [
+  {
+    name: "Expert A",
+    role: "Financial Analyst",
+    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_A,
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A
+  },
+  {
+    name: "Expert B",
+    role: "Risk Manager",
+    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_B,
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B
+  },
+  {
+    name: "Expert C",
+    role: "Investment Strategist",
+    apiEndpoint: process.env.NEXT_PUBLIC_DIFY_API_ENDPOINT_C,
+    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_C
+  }
+];
+
 const initialAIAgents: AIAgent[] = [
   { id: 1, name: "自然言語処理専門家A", expertise: "自然言語処理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 87 },
   { id: 2, name: "データサイエンティストB", expertise: "データサイエンス", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 65 },
   { id: 3, name: "プロジェクトマネージャーC", expertise: "プロジェクト管理", avatar: "/placeholder.svg?height=40&width=40", isActive: true, likes: 92 },
 ]
+
+// sendMessageToAgent関数を追加
+const sendMessageToAgent = async (message: string, agent: AgentConfig): Promise<string> => {
+  try {
+    const response = await fetch(agent.apiEndpoint!, {  // !を追加して型エラーを解消
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${agent.apiKey!}`,  // !を追加
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: {},
+        query: message,
+        response_mode: 'blocking',
+        user: `user-${Date.now()}`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.statusText}`);
+    }
+
+    const data: DifyResponse = await response.json();
+    return data.answer;
+  } catch (error) {
+    console.error(`${agent.name}からの応答でエラーが発生:`, error);
+    return `${agent.name}からの応答中にエラーが発生しました。`;
+  }
+};
 
 export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -62,55 +119,62 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
     }
   }, [messages])
 
+  // handleSendMessageを更新
   const handleSendMessage = async () => {
     if (inputMessage.trim() !== "") {
-        try {
-            const newMessage: Message = {
-                id: messages.length + 1,
-                sender: "ユーザー",
-                content: inputMessage,
-                timestamp: new Date(),
-            }
-            setMessages([...messages, newMessage])
-            setInputMessage("")
-            setIsLoading(true)
+      try {
+        const newMessage: Message = {
+          id: messages.length + 1,
+          sender: "ユーザー",
+          content: inputMessage,
+          timestamp: new Date(),
+        };
+        setMessages([...messages, newMessage]);
+        setInputMessage("");
+        setIsLoading(true);
 
-            // Dify APIを呼び出し
-            const conversationId = ""; // 必要に応じて会話IDを設定
-            const userId = "user-" + Date.now(); // ユニークなユーザーIDを生成
-            const aiResponse = await fetchChatbotResponse(inputMessage, conversationId, userId);
+        // アクティブな専門家全員から回答を取得
+        const activeAgents = agents.filter((_, index) => 
+          aiAgents[index].isActive
+        );
 
-            if (aiResponse) {
-                const aiMessage: Message = {
-                    id: messages.length + 2,
-                    sender: "自然言語処理専門家A",
-                    content: aiResponse,
-                    timestamp: new Date(),
-                };
+        // 全ての専門家からの応答を並行して取得
+        const responses = await Promise.all(
+          activeAgents.map(agent => sendMessageToAgent(inputMessage, agent))
+        );
 
-                setMessages(prevMessages => [...prevMessages, aiMessage]);
+        // 各専門家の応答をメッセージとして追加
+        responses.forEach((response, index) => {
+          const aiMessage: Message = {
+            id: messages.length + 2 + index,
+            sender: activeAgents[index].name,
+            content: response,
+            timestamp: new Date(),
+          };
+          setMessages(prevMessages => [...prevMessages, aiMessage]);
 
-                if (isSpeechEnabled) {
-                    const utterance = new SpeechSynthesisUtterance(aiResponse);
-                    utterance.lang = 'ja-JP'; // 日本語に設定
-                    speechSynthesis.speak(utterance);
-                }
-            }
-        } catch (error) {
-            console.error("メッセージ送信中にエラーが発生しました:", error);
-            // エラーメッセージを表示
-            const errorMessage: Message = {
-                id: messages.length + 2,
-                sender: "システム",
-                content: "申し訳ありません。エラーが発生しました。もう一度お試しください。",
-                timestamp: new Date(),
-            };
-            setMessages(prevMessages => [...prevMessages, errorMessage]);
-        } finally {
-            setIsLoading(false);
-        }
+          // 音声読み上げが有効な場合
+          if (isSpeechEnabled) {
+            const utterance = new SpeechSynthesisUtterance(response);
+            utterance.lang = 'ja-JP';
+            speechSynthesis.speak(utterance);
+          }
+        });
+
+      } catch (error) {
+        console.error("エラーが発生しました:", error);
+        const errorMessage: Message = {
+          id: messages.length + 2,
+          sender: "システム",
+          content: "申し訳ありません。エラーが発生しました。",
+          timestamp: new Date(),
+        };
+        setMessages(prevMessages => [...prevMessages, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }
+  };
 
   const toggleAgentActive = (agentId: number) => {
     setAIAgents(prevAgents =>
@@ -145,40 +209,6 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
   const resetConversation = () => {
     setMessages([])
-  }
-
-  async function fetchChatbotResponse(
-    query: string, 
-    conversationId: string, 
-    userId: string
-  ): Promise<string> {
-    try {
-        const response = await fetch('https://api.dify.ai/v1/chat-messages', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer app-lxKRD1QhC783612Fr65VWtYs',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                inputs: {},
-                query: query,
-                response_mode: 'blocking', // streamingではなくblockingモードに変更
-                conversation_id: conversationId,
-                user: userId,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Error: ${response.statusText}`);
-        }
-
-        const data: DifyResponse = await response.json();
-        console.log('Dify API Response:', data); // デバッグ用
-        return data.answer;
-    } catch (error) {
-        console.error("API呼び出しに失敗しました:", error);
-        return "申し訳ありません。エラーが発生しました。もう一度お試しください。";
-    }
   }
 
   return (
