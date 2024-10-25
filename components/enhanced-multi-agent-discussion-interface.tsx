@@ -182,71 +182,76 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, newMessage]);
+      const messageToSend = inputMessage; // 入力メッセージを保存
       setInputMessage("");
 
       const activeAgents = agentConfigs.filter((_, index) => aiAgents[index].isActive);
 
       // エージェントごとに順番に処理
-      for (const agent of activeAgents) {
+      for (let i = 0; i < activeAgents.length; i++) {
+        const agent = activeAgents[i];
         try {
-          // 各エージェントのリクエスト前に3秒待機
-          await sleep(3000);
+          // 最初のエージェント以外は長めの待機時間を設定
+          if (i > 0) {
+            await sleep(5000); // 5秒待機
+          }
           
           console.log(`${agent.name}に送信中...`);
-          const response = await sendMessageToAgent(inputMessage, agent);
-          
-          const aiMessage: Message = {
-            id: Date.now(),
-            sender: agent.name,
-            content: response,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, aiMessage]);
+          let response;
+          let retryCount = 0;
+          const maxRetries = 3;
 
-          if (isSpeechEnabled) {
-            const utterance = new SpeechSynthesisUtterance(response);
-            utterance.lang = 'ja-JP';
-            speechSynthesis.speak(utterance);
+          while (retryCount < maxRetries) {
+            try {
+              response = await sendMessageToAgent(messageToSend, agent);
+              break; // 成功したらループを抜ける
+            } catch (error) {
+              const apiError = error as APIError;
+              if (apiError.message.includes('Rate Limit Error')) {
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  const waitTime = retryCount * 10000; // 10秒、20秒、30秒と増加
+                  setMessages(prev => [...prev, {
+                    id: Date.now(),
+                    sender: "システム",
+                    content: `${agent.name}へのリクエストが制限されました。${waitTime/1000}秒後に再試行します...`,
+                    timestamp: new Date(),
+                  }]);
+                  await sleep(waitTime);
+                } else {
+                  throw new Error(`${agent.name}への最大試行回数を超えました`);
+                }
+              } else {
+                throw error; // レート制限以外のエラーは再スロー
+              }
+            }
+          }
+
+          if (response) {
+            const aiMessage: Message = {
+              id: Date.now(),
+              sender: agent.name,
+              content: response,
+              timestamp: new Date(),
+            };
+            setMessages(prev => [...prev, aiMessage]);
+
+            if (isSpeechEnabled) {
+              const utterance = new SpeechSynthesisUtterance(response);
+              utterance.lang = 'ja-JP';
+              speechSynthesis.speak(utterance);
+            }
           }
 
         } catch (error) {
           const apiError = error as APIError;
           console.error(`${agent.name}からの応答でエラー:`, apiError);
-          
-          if (apiError.message.includes('Rate Limit Error')) {
-            setMessages(prev => [...prev, {
-              id: Date.now(),
-              sender: "システム",
-              content: `${agent.name}へのリクエストが制限されました。10秒後に再試行します...`,
-              timestamp: new Date(),
-            }]);
-            
-            // レート制限時は10秒待機してから再試行
-            await sleep(10000);
-            try {
-              const retryResponse = await sendMessageToAgent(inputMessage, agent);
-              setMessages(prev => [...prev, {
-                id: Date.now(),
-                sender: agent.name,
-                content: retryResponse,
-                timestamp: new Date(),
-              }]);
-            } catch (retryError) {
-              setMessages(prev => [...prev, {
-                id: Date.now(),
-                sender: "システム",
-                content: `${agent.name}への再試行も失敗しました。しばらく待ってから試してください。`,
-                timestamp: new Date(),
-              }]);
-            }
-          } else {
-            setMessages(prev => [...prev, {
-              id: Date.now(),
-              sender: "システム",
-              content: apiError.message || `${agent.name}からの応答中にエラーが発生しました`,
-              timestamp: new Date(),
-            }]);
-          }
+          setMessages(prev => [...prev, {
+            id: Date.now(),
+            sender: "システム",
+            content: apiError.message || `${agent.name}からの応答中にエラーが発生しました`,
+            timestamp: new Date(),
+          }]);
         }
       }
     } catch (error) {
