@@ -137,6 +137,12 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
       });
 
       if (!response.ok) {
+        // レートリミットエラーの場合の特別な処理
+        if (response.status === 429 || 
+            (response.status === 400 && response.statusText.includes('Rate Limit'))) {
+          return `${agent.name}: APIのアクセスリミットに達しました。しばらく待ってから再試行してください。`;
+        }
+        
         const errorData = await response.json().catch(() => ({}));
         console.error('API Error Details:', errorData);
         throw new Error(`APIエラー: ${response.status} - ${errorData.message || '不明なエラー'}`);
@@ -158,10 +164,13 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
         return `${agent.name}からの応答を解析できませんでした。`;
       }
     } catch (error) {
-      console.error(`${agent.name}のAPI呼び出しの詳細エラー:`, error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        return `${agent.name}との接続に失敗しました。インターネット接続を確認してください。`;
+      if (error instanceof Error && 
+          (error.message.includes('Rate Limit') || 
+           error.message.includes('429'))) {
+        return `${agent.name}: APIのアクセスリミットに達しました。しばらく待ってから再試行してください。`;
       }
+      
+      console.error(`${agent.name}のAPI呼び出しの詳細エラー:`, error);
       const apiError = error as APIError;
       return `${agent.name}との通信中にエラー: ${apiError.message}`;
     }
@@ -214,7 +223,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                   setMessages(prev => [...prev, {
                     id: Date.now(),
                     sender: "システム",
-                    content: `${agent.name}へのリクエストが制限されました。${waitTime/1000}秒後に再試行します...`,
+                    content: `${agent.name}へのリクエスト��制限されました。${waitTime/1000}秒後に再試行します...`,
                     timestamp: new Date(),
                   }]);
                   await sleep(waitTime);
@@ -277,13 +286,13 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   useEffect(() => {
     setAgentConfigs([
       {
-        name: "自然言語処理専門家A",
+        name: "機械学習専門家A",  // 変更
         role: "Financial Analyst",
         apiEndpoint: "https://api.dify.ai/v1/chat-messages",
         apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A || ''
       },
       {
-        name: "データサイエンティストB",
+        name: "エンジニアB",  // 変更
         role: "Risk Manager",
         apiEndpoint: "https://api.dify.ai/v1/chat-messages",
         apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B || ''
