@@ -30,53 +30,24 @@ type AIAgent = {
   likes: number
 }
 
-// 型定義��加
-type DifyResponse = {
-    answer: string;
-    conversation_id: string;
-    message_id: string;
-}
-
 interface AgentConfig {
   name: string;
   role: string;
-  apiEndpoint: string; // dify APIのエンドポイントを追加
-  apiKey: string;      // dify APIキーを追加
+  apiEndpoint: string;
+  apiKey: string;
 }
 
-// エラー型の定義を追加
+// エラー型の定義
 interface APIError extends Error {
   message: string;
 }
-
-// agents の定義を修正
-const agents: AgentConfig[] = [
-  {
-    name: "機械学習専門家A",
-    role: "Financial Analyst",
-    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A || ''
-  },
-  {
-    name: "エンジニアB",
-    role: "Risk Manager",
-    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B || ''
-  },
-  {
-    name: "プロジェクトマネージャーC",
-    role: "Investment Strategist",
-    apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
-    apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_C || ''
-  }
-];
 
 const initialAIAgents: AIAgent[] = [
   { 
     id: 1, 
     name: "機械学習専門家A", 
     expertise: "機械学習", 
-    avatar: "", // 空文字列に変更
+    avatar: "",
     isActive: true, 
     likes: 87 
   },
@@ -84,7 +55,7 @@ const initialAIAgents: AIAgent[] = [
     id: 2, 
     name: "エンジニアB", 
     expertise: "エンジニアリング", 
-    avatar: "", // 空文字列に変更
+    avatar: "",
     isActive: true, 
     likes: 65 
   },
@@ -92,7 +63,7 @@ const initialAIAgents: AIAgent[] = [
     id: 3, 
     name: "プロジェクトマネージャーC", 
     expertise: "プロジェクト管理", 
-    avatar: "", // 空文字列に変更
+    avatar: "",
     isActive: true, 
     likes: 92 
   },
