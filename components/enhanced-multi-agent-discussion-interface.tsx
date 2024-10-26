@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sun, Moon, Send, Loader2, Save, Download, RotateCcw, Settings, Plus, Minus, Volume2, Heart } from "lucide-react"
-import { v4 as uuidv4 } from 'uuid';  // ファイルの先頭に追加
 
 type Message = {
   id: number
@@ -223,7 +222,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                   setMessages(prev => [...prev, {
                     id: Date.now(),
                     sender: "システム",
-                    content: `${agent.name}へのリクエスト��制限されました。${waitTime/1000}秒後に再試行します...`,
+                    content: `${agent.name}へのリクエスト制限されました。${waitTime/1000}秒後に再試行します...`,
                     timestamp: new Date(),
                   }]);
                   await sleep(waitTime);
