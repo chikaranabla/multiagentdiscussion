@@ -30,7 +30,7 @@ type AIAgent = {
   likes: number
 }
 
-// 型定義追加
+// 型定義��加
 type DifyResponse = {
     answer: string;
     conversation_id: string;
@@ -355,17 +355,6 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
   const resetConversation = () => {
     setMessages([])
-  }
-
-  // 音声設定の追加
-  const handleSpeech = (text: string) => {
-    if (!isSpeechEnabled) return
-    
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'ja-JP'
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    speechSynthesis.speak(utterance)
   }
 
   return (

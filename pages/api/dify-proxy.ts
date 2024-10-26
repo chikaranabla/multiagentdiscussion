@@ -5,7 +5,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { apiKey, query, ...otherParams } = req.body;
+  const { apiKey, query } = req.body;  // otherParamsを削除
 
   try {
     const response = await fetch('https://api.dify.ai/v1/chat-messages', {
@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         query: query,
         user: "default-user",
         response_mode: "blocking",
-        conversation_id: null  // 新規会話の場合はnull
+        conversation_id: null
       })
     });
 
