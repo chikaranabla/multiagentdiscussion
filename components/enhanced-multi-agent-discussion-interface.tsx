@@ -186,7 +186,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
 
       const newMessage: Message = {
         id: messages.length + 1,
-        sender: "ユーザー",
+        sender: "あなた",
         content: inputMessage,
         timestamp: new Date(),
       };
@@ -439,7 +439,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -50 }}
                   transition={{ duration: 0.3 }}
-                  className={`mb-4 ${message.sender === "ユザー" ? "text-right" : "text-left"}`}
+                  className={`mb-4 ${message.sender === "ユーザー" ? "text-right" : "text-left"}`}
                 >
                   <div className={`inline-block p-3 rounded-lg ${message.sender === "ユーザー" ? "bg-blue-500 text-white" : "bg-gray-200 dark:bg-gray-700"}`}>
                     <p className="font-bold">{message.sender}</p>
@@ -483,6 +483,9 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
                 </Button>
                 <Button onClick={resetConversation} className="w-full bg-red-500 hover:bg-red-600 text-white">
                   <RotateCcw className="mr-2 h-4 w-4" /> 会話をリセット
+                </Button>
+                <Button onClick={resetConversation} className="w-full bg-blue-500 hover:bg-red-600 text-white">
+                  <RotateCcw className="mr-2 h-4 w-4" /> 要約
                 </Button>
               </div>
             </TabsContent>
