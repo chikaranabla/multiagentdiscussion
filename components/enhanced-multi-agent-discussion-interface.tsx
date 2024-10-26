@@ -53,13 +53,13 @@ interface APIError extends Error {
 // agents の定義を修正
 const agents: AgentConfig[] = [
   {
-    name: "自然言語処理専門家A",
+    name: "機械学習専門家A",
     role: "Financial Analyst",
     apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
     apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_A || ''
   },
   {
-    name: "データサイエンティストB",
+    name: "エンジニアB",
     role: "Risk Manager",
     apiEndpoint: "https://api.dify.ai/v1/chat-messages",  // 正しいエンドポイント
     apiKey: process.env.NEXT_PUBLIC_DIFY_API_KEY_B || ''
@@ -75,16 +75,16 @@ const agents: AgentConfig[] = [
 const initialAIAgents: AIAgent[] = [
   { 
     id: 1, 
-    name: "自然言語処理専門A", 
-    expertise: "自然言語処理", 
+    name: "機械学習専門家A", 
+    expertise: "機械学習", 
     avatar: "", // 空文字列に変更
     isActive: true, 
     likes: 87 
   },
   { 
     id: 2, 
-    name: "データサイエンティストB", 
-    expertise: "データサイエンス", 
+    name: "エンジニアB", 
+    expertise: "エンジニアリング", 
     avatar: "", // 空文字列に変更
     isActive: true, 
     likes: 65 
@@ -363,7 +363,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
   return (
     <div className={`flex flex-col h-screen w-full transition-colors duration-200 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
       <header className="flex justify-between items-center p-4 border-b dark:border-gray-700 bg-gradient-to-r from-purple-600 to-indigo-700 text-white shadow-lg">
-        <h1 className="text-3xl font-bold">マルチエージェントとの議論</h1>
+        <h1 className="text-3xl font-bold">マルチエージェント議論</h1>
         <div className="flex items-center space-x-4">
           <TooltipProvider>
             <Tooltip>
@@ -383,7 +383,7 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
       </header>
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-80 border-r dark:border-gray-700 p-4 overflow-y-auto bg-gray-50 dark:bg-gray-800">
-          <h2 className="text-xl font-semibold mb-4">AIエージェント</h2>
+          <h2 className="text-xl font-semibold mb-4">AIエージェントを選択</h2>
           {aiAgents.map((agent) => (
             <Card key={agent.id} className="mb-4 hover:shadow-lg transition-shadow duration-300 overflow-hidden">
               <CardContent className="p-4 relative">
@@ -508,9 +508,9 @@ export function EnhancedMultiAgentDiscussionInterfaceComponent() {
         <PopoverContent className="w-80">
           <div className="grid gap-4">
             <div className="space-y-2">
-              <h4 className="font-medium leading-none">クイック設</h4>
+              <h4 className="font-medium leading-none">クイック設定</h4>
               <p className="text-sm text-muted-foreground">
-                エージェントの追加/除やその他の設定を行います。
+                エージェントの追加/削除やその他の設定を行います。削
               </p>
             </div>
             <div className="grid gap-2">
